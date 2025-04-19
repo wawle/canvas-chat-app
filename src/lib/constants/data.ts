@@ -2445,4 +2445,238 @@ Bu TripAdvisor benzeri uygulama:
 Bu örnek, React hooks (useState, useEffect) kullanarak durum yönetimini gerçekleştiriyor ve gerçek bir uygulama için gerekli temel özellikleri içeriyor. API entegrasyonu ekleyerek, bu uygulamayı gerçek verilerle çalışacak şekilde geliştirebilirsiniz.`,
     createdAt: new Date(),
   },
+
+  {
+    id: "12345",
+    role: "user",
+    content: "Klavye ile kontrol edilebilen yılan oyunu yapabilir misin?",
+    createdAt: new Date(),
+  },
+
+  {
+    id: "12346",
+    role: "assistant",
+    content: `Tabii ki! İşte klavye ile kontrol edilebilen basit bir yılan oyunu:
+
+\`\`\`jsx
+import React, { useState, useEffect, useRef } from 'react';
+
+const GRID_SIZE = 20;
+const CELL_SIZE = 20;
+const INITIAL_SPEED = 100;
+
+const directions = {
+  UP: { x: 0, y: -1 },
+  DOWN: { x: 0, y: 1 },
+  LEFT: { x: -1, y: 0 },
+  RIGHT: { x: 1, y: 0 }
+};
+
+const YilanOyunu = () => {
+  const [snake, setSnake] = useState([{ x: 10, y: 10 }]);
+  const [food, setFood] = useState({ x: 5, y: 5 });
+  const [direction, setDirection] = useState(directions.RIGHT);
+  const [gameOver, setGameOver] = useState(false);
+  const [score, setScore] = useState(0);
+  const [speed, setSpeed] = useState(INITIAL_SPEED);
+  const gameRef = useRef(null);
+
+  // Rastgele yiyecek oluştur
+  const generateFood = () => {
+    const x = Math.floor(Math.random() * GRID_SIZE);
+    const y = Math.floor(Math.random() * GRID_SIZE);
+    
+    // Yılanın üzerinde yiyecek oluşturmamak için kontrol
+    for (const segment of snake) {
+      if (segment.x === x && segment.y === y) {
+        return generateFood();
+      }
+    }
+    
+    return { x, y };
+  };
+
+  // Yılanı hareket ettir
+  const moveSnake = () => {
+    if (gameOver) return;
+
+    const newSnake = [...snake];
+    const head = { 
+      x: newSnake[0].x + direction.x, 
+      y: newSnake[0].y + direction.y 
+    };
+
+    // Duvar çarpışması kontrolü
+    if (head.x < 0 || head.x >= GRID_SIZE || head.y < 0 || head.y >= GRID_SIZE) {
+      setGameOver(true);
+      return;
+    }
+
+    // Kendine çarpma kontrolü
+    for (const segment of newSnake) {
+      if (head.x === segment.x && head.y === segment.y) {
+        setGameOver(true);
+        return;
+      }
+    }
+
+    // Yılanı ilerlet
+    newSnake.unshift(head);
+    
+    // Yiyecek yeme kontrolü
+    if (head.x === food.x && head.y === food.y) {
+      setFood(generateFood());
+      setScore(score + 1);
+      setSpeed(Math.max(INITIAL_SPEED - (score * 2), 50)); // Hızı artır
+    } else {
+      newSnake.pop(); // Yiyecek yemediyse kuyruğu kısalt
+    }
+
+    setSnake(newSnake);
+  };
+
+  // Klavye kontrollerini ayarla
+  useEffect(() => {
+    const handleKeyPress = (e) => {
+      e.preventDefault();
+      
+      switch (e.key) {
+        case 'ArrowUp':
+          if (direction !== directions.DOWN) {
+            setDirection(directions.UP);
+          }
+          break;
+        case 'ArrowDown':
+          if (direction !== directions.UP) {
+            setDirection(directions.DOWN);
+          }
+          break;
+        case 'ArrowLeft':
+          if (direction !== directions.RIGHT) {
+            setDirection(directions.LEFT);
+          }
+          break;
+        case 'ArrowRight':
+          if (direction !== directions.LEFT) {
+            setDirection(directions.RIGHT);
+          }
+          break;
+        case 'r':
+        case 'R':
+          resetGame();
+          break;
+        default:
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => {
+      window.removeEventListener('keydown', handleKeyPress);
+    };
+  }, [direction]);
+
+  // Oyun döngüsü
+  useEffect(() => {
+    if (!gameOver) {
+      const interval = setInterval(moveSnake, speed);
+      return () => clearInterval(interval);
+    }
+  }, [snake, gameOver, direction, food, score, speed]);
+
+  // Oyunu sıfırla
+  const resetGame = () => {
+    setSnake([{ x: 10, y: 10 }]);
+    setFood(generateFood());
+    setDirection(directions.RIGHT);
+    setGameOver(false);
+    setScore(0);
+    setSpeed(INITIAL_SPEED);
+    
+    if (gameRef.current) {
+      gameRef.current.focus();
+    }
+  };
+
+  return (
+    <div className="flex flex-col items-center justify-center p-4">
+      <h2 className="text-2xl font-bold mb-4">Yılan Oyunu</h2>
+      
+      <div className="mb-4">
+        <span className="text-lg font-semibold">Skor: {score}</span>
+      </div>
+      
+      <div 
+        ref={gameRef}
+        className="relative border-2 border-gray-800 focus:outline-none"
+        style={{ 
+          width: GRID_SIZE * CELL_SIZE, 
+          height: GRID_SIZE * CELL_SIZE,
+          backgroundColor: '#f0f0f0'
+        }}
+        tabIndex={0}
+      >
+        {/* Yılan */}
+        {snake.map((segment, index) => (
+          <div
+            key={index}
+            className="absolute bg-green-500"
+            style={{
+              width: CELL_SIZE,
+              height: CELL_SIZE,
+              left: segment.x * CELL_SIZE,
+              top: segment.y * CELL_SIZE,
+              borderRadius: index === 0 ? '4px' : '0' // Baş kısmı yuvarlak
+            }}
+          />
+        ))}
+        
+        {/* Yiyecek */}
+        <div
+          className="absolute bg-red-500 rounded-full"
+          style={{
+            width: CELL_SIZE - 2,
+            height: CELL_SIZE - 2,
+            left: food.x * CELL_SIZE + 1,
+            top: food.y * CELL_SIZE + 1
+          }}
+        />
+        
+        {/* Oyun sonu ekranı */}
+        {gameOver && (
+          <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center flex-col">
+            <div className="text-white text-2xl font-bold mb-4">Oyun Bitti!</div>
+            <div className="text-white text-xl mb-4">Skorunuz: {score}</div>
+            <button
+              className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+              onClick={resetGame}
+            >
+              Tekrar Oyna
+            </button>
+          </div>
+        )}
+      </div>
+      
+      <div className="mt-4 text-sm text-gray-600">
+        <p>Kontroller: Ok tuşları ile yılanı yönlendir, R tuşu ile oyunu sıfırla</p>
+      </div>
+    </div>
+  );
+};
+
+export default YilanOyunu;
+\`\`\`
+
+Bu kod:
+
+1. Klavye ok tuşlarıyla kontrol edilebilen bir yılan oyunu oluşturur
+2. Yılan yiyeceği yedikçe büyür ve skor artar
+3. Duvara veya kendine çarptığında oyun biter
+4. R tuşuyla oyunu yeniden başlatabilirsiniz
+5. Yılan yiyecek yedikçe hızı da artar
+6. Tailwind CSS ile şık bir arayüz sunar
+
+Oyunu bir sayfaya eklemek için bu bileşeni import edip kullanabilirsiniz. İsterseniz GRID_SIZE, CELL_SIZE ve INITIAL_SPEED değerlerini değiştirerek oyun alanının boyutunu ve hızını özelleştirebilirsiniz.`,
+    createdAt: new Date(),
+  },
 ];
