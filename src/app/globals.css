@@ -120,3 +120,32 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Split.js uyarlamaları */
+.split {
+  display: flex;
+  flex-direction: row;
+}
+
+.gutter {
+  background-color: oklch(var(--border));
+  background-repeat: no-repeat;
+  background-position: 50%;
+}
+
+.gutter:hover {
+  background-color: oklch(var(--border) / 0.8);
+}
+
+.gutter.gutter-horizontal {
+  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUAAAAeCAYAAADkftS9AAAAIklEQVQoU2M4c+bMfxAGAgYYmwGrIIiDjrELjpo5aiZeMwF+yNnOs5KSvgAAAABJRU5ErkJggg==");
+  cursor: col-resize;
+}
+
+.dark .gutter {
+  background-color: oklch(var(--border));
+}
+
+.dark .gutter:hover {
+  background-color: oklch(var(--muted) / 0.8);
+}

@@ -14,11 +14,7 @@ Bu proje, ChatGPT benzeri bir arayüze sahip, kullanıcıların AI ile etkileşi
 
 - **Canvas Kod Görselleştirme**:
 
-  - AI tarafından üretilen kodun interaktif canvas üzerinde gösterimi
-  - Kod bileşenleri arasında ilişkileri gösteren bağlantılar
-  - Sürükle-bırak yöntemi ile kod blokları düzenleme
-  - Yakınlaştırma/uzaklaştırma ve pan özellikleri
-  - Kod blokları için renk kodlaması ve etiketleme
+  - AI tarafından üretilen kodun interaktif canvas üzerinde çalışır halinin gösterimi
 
 - **AI Destekli Kod Üretimi**:
 
