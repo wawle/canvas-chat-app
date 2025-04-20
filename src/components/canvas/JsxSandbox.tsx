@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { RefreshCwIcon } from "lucide-react";
 
 interface Props {
@@ -11,6 +11,14 @@ export function JsxSandbox({ code }: Props) {
   const [output, setOutput] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [iframeError, setIframeError] = useState<string | null>(null);
+
+  // Iframe hata durumunu sıfırla
+  useEffect(() => {
+    if (code) {
+      setIframeError(null);
+    }
+  }, [code]);
 
   // Kod değiştiğinde otomatik çalıştırma
   useEffect(() => {
@@ -24,6 +32,21 @@ export function JsxSandbox({ code }: Props) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code]);
+
+  // Iframe içindeki hataları yakalamak için bir işlev
+  const handleIframeError = useCallback((event: MessageEvent) => {
+    if (event.data && event.data.type === "iframe-error") {
+      setIframeError(event.data.message);
+    }
+  }, []);
+
+  // Event listener ekle/kaldır
+  useEffect(() => {
+    window.addEventListener("message", handleIframeError);
+    return () => {
+      window.removeEventListener("message", handleIframeError);
+    };
+  }, [handleIframeError]);
 
   // Geliştirilmiş HTML şablonu - daha fazla kütüphane ve stil desteği ile
   const createHtmlTemplate = (reactCode: string) => {
@@ -46,6 +69,23 @@ export function JsxSandbox({ code }: Props) {
   <script>
     // ReactRouterDOM global değişkeni için destek ekle
     window.ReactRouterDOM = window.ReactRouterDOM || window.ReactRouter;
+    
+    // Global hata yakalama
+    window.onerror = function(message, source, lineno, colno, error) {
+      window.parent.postMessage({ 
+        type: 'iframe-error', 
+        message: 'JavaScript Hatası: ' + message + ' (' + source + ':' + lineno + ':' + colno + ')'
+      }, '*');
+      return true;
+    };
+    
+    // Promise hatalarını yakala
+    window.addEventListener('unhandledrejection', function(event) {
+      window.parent.postMessage({ 
+        type: 'iframe-error', 
+        message: 'İşlenmeyen Promise Hatası: ' + event.reason
+      }, '*');
+    });
   </script>
   
   <style>
@@ -199,105 +239,149 @@ export function JsxSandbox({ code }: Props) {
     // Axios tanımla
     const api = window.axios || { get: () => Promise.resolve({ data: {} }) };
     
-    // İşlenmiş React kodu
-    ${reactCode}
+    // Bileşen hata sınırı
+    class ErrorBoundary extends React.Component {
+      constructor(props) {
+        super(props);
+        this.state = { hasError: false, error: null };
+      }
+      
+      static getDerivedStateFromError(error) {
+        return { hasError: true, error };
+      }
+      
+      componentDidCatch(error, errorInfo) {
+        console.error("Bileşen hatası:", error, errorInfo);
+        window.parent.postMessage({ 
+          type: 'iframe-error', 
+          message: 'React Bileşen Hatası: ' + error.message
+        }, '*');
+      }
+      
+      render() {
+        if (this.state.hasError) {
+          return <div style={{ color: 'red', padding: '10px', border: '1px solid red', borderRadius: '5px' }}>
+            <h3>Bileşen Hatası</h3>
+            <p>{this.state.error && this.state.error.message}</p>
+          </div>;
+        }
+        return this.props.children;
+      }
+    }
+    
+    try {
+      // İşlenmiş React kodu
+      ${reactCode}
 
-    // JSX kodunu çalıştırmak için gerekli yardımcı fonksiyonlar
-    function detectMainComponent() {
-      try {
-        // Global alanda tanımlanan tüm bileşenleri bul
-        const components = Object.keys(window).filter(key => {
-          return key[0] === key[0].toUpperCase() && 
-                (typeof window[key] === 'function' || 
-                (window[key] && typeof window[key].render === 'function'));
-        });
-        
-        // En olası ana bileşen adaylarını belirle
-        const mainComponentNames = ['App', 'TodoApp', 'Main', 'Root', 'Component', 'Example'];
-        let mainComponent = null;
-        
-        // Önce bilinen ana bileşen isimlerini kontrol et
-        for (const name of mainComponentNames) {
-          if (window[name] && typeof window[name] === 'function') {
-            mainComponent = window[name];
-            console.log('Ana bileşen bulundu:', name);
-            break;
+      // JSX kodunu çalıştırmak için gerekli yardımcı fonksiyonlar
+      function detectMainComponent() {
+        try {
+          // Global alanda tanımlanan tüm bileşenleri bul
+          const components = Object.keys(window).filter(key => {
+            return key[0] === key[0].toUpperCase() && 
+                  (typeof window[key] === 'function' || 
+                  (window[key] && typeof window[key].render === 'function'));
+          });
+          
+          // En olası ana bileşen adaylarını belirle
+          const mainComponentNames = ['App', 'TodoApp', 'Main', 'Root', 'Component', 'Example'];
+          let mainComponent = null;
+          
+          // Önce bilinen ana bileşen isimlerini kontrol et
+          for (const name of mainComponentNames) {
+            if (window[name] && typeof window[name] === 'function') {
+              mainComponent = window[name];
+              console.log('Ana bileşen bulundu:', name);
+              break;
+            }
           }
+          
+          // Eğer bulunamadıysa, export default olarak işaretlenmiş bileşeni kontrol et
+          if (!mainComponent && window.DefaultExport) {
+            mainComponent = window.DefaultExport;
+            console.log('DefaultExport bileşeni kullanılıyor');
+          }
+          
+          // Hala bulunamadıysa, bulunan ilk bileşeni kullan
+          if (!mainComponent && components.length > 0) {
+            mainComponent = window[components[0]];
+            console.log('İlk bulunan bileşen kullanılıyor:', components[0]);
+          }
+          
+          return mainComponent;
+        } catch (err) {
+          console.error('Bileşen tespit hatası:', err);
+          return null;
         }
-        
-        // Eğer bulunamadıysa, export default olarak işaretlenmiş bileşeni kontrol et
-        if (!mainComponent && window.DefaultExport) {
-          mainComponent = window.DefaultExport;
-          console.log('DefaultExport bileşeni kullanılıyor');
-        }
-        
-        // Hala bulunamadıysa, bulunan ilk bileşeni kullan
-        if (!mainComponent && components.length > 0) {
-          mainComponent = window[components[0]];
-          console.log('İlk bulunan bileşen kullanılıyor:', components[0]);
-        }
-        
-        return mainComponent;
-      } catch (err) {
-        console.error('Bileşen tespit hatası:', err);
-        return null;
       }
-    }
     
-    // JSX kodundan bileşen oluştur ve render et
-    function renderJsxCode() {
-      try {
-        const mainComponent = detectMainComponent();
-        
-        if (mainComponent) {
-          // Ana bileşen bulunduğunda render et
-          const MainComponent = mainComponent;
-          ReactDOM.createRoot(document.getElementById('root')).render(
-            <MainComponent />
-          );
-        } else {
-          // Doğrudan içeriği render etmeyi dene
-          const jsxContent = document.getElementById('jsx-content');
-          if (jsxContent && jsxContent.textContent) {
-            const JSXElement = eval('(' + jsxContent.textContent + ')');
-            ReactDOM.createRoot(document.getElementById('root')).render(JSXElement);
+      // JSX kodundan bileşen oluştur ve render et
+      function renderJsxCode() {
+        try {
+          const mainComponent = detectMainComponent();
+          
+          if (mainComponent) {
+            // Ana bileşen bulunduğunda render et
+            const MainComponent = mainComponent;
+            ReactDOM.createRoot(document.getElementById('root')).render(
+              <ErrorBoundary>
+                <MainComponent />
+              </ErrorBoundary>
+            );
           } else {
-            throw new Error('Render edilecek bir React bileşeni bulunamadı');
+            // Doğrudan içeriği render etmeyi dene
+            const jsxContent = document.getElementById('jsx-content');
+            if (jsxContent && jsxContent.textContent) {
+              const JSXElement = eval('(' + jsxContent.textContent + ')');
+              ReactDOM.createRoot(document.getElementById('root')).render(
+                <ErrorBoundary>
+                  {JSXElement}
+                </ErrorBoundary>
+              );
+            } else {
+              throw new Error('Render edilecek bir React bileşeni bulunamadı');
+            }
           }
+        } catch (err) {
+          console.error('Render hatası:', err);
+          document.getElementById('root').innerHTML = '<div style="color: red; padding: 20px;">Render hatası: ' + err.message + '</div>';
+          window.parent.postMessage({ type: 'iframe-error', message: 'Render hatası: ' + err.message }, '*');
         }
-      } catch (err) {
-        console.error('Render hatası:', err);
-        document.getElementById('root').innerHTML = '<div style="color: red; padding: 20px;">Render hatası: ' + err.message + '</div>';
       }
-    }
     
-    // İşlev: kodun bir JSX ifadesi olup olmadığını kontrol et
-    function isJsxExpression(code) {
-      try {
-        // JSX içeriği ayrı bir script tagli altında sakla
-        const jsxContentElm = document.createElement('script');
-        jsxContentElm.id = 'jsx-content';
-        jsxContentElm.type = 'text/jsx';
-        jsxContentElm.textContent = code;
-        document.body.appendChild(jsxContentElm);
-        
-        // Başlangıçta React bileşenlerini deneyelim
-        renderJsxCode();
-        return true;
-      } catch (e) {
-        console.log('JSX ifadesi değil, hata:', e);
-        return false;
+      // İşlev: kodun bir JSX ifadesi olup olmadığını kontrol et
+      function isJsxExpression(code) {
+        try {
+          // JSX içeriği ayrı bir script tagli altında sakla
+          const jsxContentElm = document.createElement('script');
+          jsxContentElm.id = 'jsx-content';
+          jsxContentElm.type = 'text/jsx';
+          jsxContentElm.textContent = code;
+          document.body.appendChild(jsxContentElm);
+          
+          // Başlangıçta React bileşenlerini deneyelim
+          renderJsxCode();
+          return true;
+        } catch (e) {
+          console.log('JSX ifadesi değil, hata:', e);
+          return false;
+        }
       }
-    }
-    
-    // Doğrudan JSX ifadesini dene, başarısız olursa normal React bileşenlerini dene
-    if (!isJsxExpression(\`${reactCode}\`)) {
-      try {
-        renderJsxCode();
-      } catch (err) {
-        console.error('Render hatası:', err);
-        document.getElementById('root').innerHTML = '<div style="color: red; padding: 20px;">Render hatası: ' + err.message + '</div>';
+      
+      // Doğrudan JSX ifadesini dene, başarısız olursa normal React bileşenlerini dene
+      if (!isJsxExpression(\`${reactCode}\`)) {
+        try {
+          renderJsxCode();
+        } catch (err) {
+          console.error('Render hatası:', err);
+          document.getElementById('root').innerHTML = '<div style="color: red; padding: 20px;">Render hatası: ' + err.message + '</div>';
+          window.parent.postMessage({ type: 'iframe-error', message: 'Render hatası: ' + err.message }, '*');
+        }
       }
+    } catch (err) {
+      console.error('Kod yürütme hatası:', err);
+      document.getElementById('root').innerHTML = '<div style="color: red; padding: 20px;">Kod yürütme hatası: ' + err.message + '</div>';
+      window.parent.postMessage({ type: 'iframe-error', message: 'Kod yürütme hatası: ' + err.message }, '*');
     }
   </script>
 </body>
@@ -308,6 +392,7 @@ export function JsxSandbox({ code }: Props) {
   const runCode = () => {
     setLoading(true);
     setError(null);
+    setIframeError(null);
 
     try {
       // LLM çıktılarında yaygın olan kod şablonlarını tespit et ve dönüştür
@@ -406,8 +491,13 @@ export function JsxSandbox({ code }: Props) {
       <div className="flex-1 overflow-hidden">
         {/* Çıktı bölümü */}
         <div className="overflow-auto bg-white h-full">
-          {error ? (
-            <div className="p-4 text-red-500 text-sm">{error}</div>
+          {error || iframeError ? (
+            <div className="p-4 bg-red-50 border border-red-200 rounded-md">
+              <div className="text-red-600 font-medium mb-1">Hata Oluştu</div>
+              <div className="text-red-500 text-sm whitespace-pre-wrap">
+                {error || iframeError}
+              </div>
+            </div>
           ) : loading ? (
             <div className="p-4 flex justify-center items-center h-full">
               <RefreshCwIcon className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -418,6 +508,7 @@ export function JsxSandbox({ code }: Props) {
               srcDoc={output}
               className="w-full h-full border-0"
               sandbox="allow-scripts allow-popups allow-same-origin"
+              onError={() => setError("iframe yüklenirken hata oluştu")}
             />
           ) : (
             <div className="p-4 flex justify-center items-center h-full text-sm text-muted-foreground">

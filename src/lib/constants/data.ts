@@ -306,8 +306,8 @@ Oyunu daha da geliştirmek için oyuncu isimlerini ekleyebilir, skor tablosu tut
   {
     id: "8",
     role: "user",
-    content: "bana hesap makinesi yap react ile",
-    createdAt: new Date(Date.now() - 5000),
+    content: "flappyBird oyunu yapar mısın",
+    createdAt: new Date(),
   },
   {
     id: "9",
@@ -331,7 +331,7 @@ function HesapMakinesi() {
       setEkran(ekran === '0' ? String(rakam) : ekran + rakam);
     }
   };
-
+  
   const islemSec = (secilenIslem) => {
     const deger = parseFloat(ekran);
     
@@ -436,7 +436,7 @@ function HesapMakinesi() {
         }}
       >
         {tusTakimi.map((tus, index) => (
-          <button
+          <button 
             key={index}
             onClick={tus.onClick}
             style={{
@@ -444,7 +444,7 @@ function HesapMakinesi() {
               fontSize: '18px',
               fontWeight: 'bold',
               backgroundColor: /[0-9]/.test(tus.deger) ? '#fff' : 
-                               tus.deger === '=' ? '#4CAF50' : '#f8f8f8',
+                             tus.deger === '=' ? '#4CAF50' : '#f8f8f8',
               border: '1px solid #ddd',
               borderRadius: '4px',
               cursor: 'pointer'
@@ -469,7 +469,7 @@ Bu hesap makinesi:
 5. Temel hesap makinesi işlevlerinin hepsini sunar
 
 Dilerseniz, renkleri değiştirerek veya hesaplama geçmişi ekleyerek daha da geliştirebilirsiniz.`,
-    createdAt: new Date(Date.now()),
+    createdAt: new Date(),
   },
   {
     id: "10",
@@ -2677,6 +2677,232 @@ Bu kod:
 6. Tailwind CSS ile şık bir arayüz sunar
 
 Oyunu bir sayfaya eklemek için bu bileşeni import edip kullanabilirsiniz. İsterseniz GRID_SIZE, CELL_SIZE ve INITIAL_SPEED değerlerini değiştirerek oyun alanının boyutunu ve hızını özelleştirebilirsiniz.`,
+    createdAt: new Date(),
+  },
+  {
+    id: "25000",
+    role: "user",
+    content: "flappyBird oyunu yapar mısın",
+    createdAt: new Date(),
+  },
+  {
+    id: "25001",
+    role: "assistant",
+    content: `Tabii, size bir Flappy Bird oyunu yapabilirim:
+
+\`\`\`jsx
+import React, { useState, useEffect, useRef } from 'react';
+
+const FlappyBird = () => {
+  const canvasRef = useRef(null);
+  const [gameStarted, setGameStarted] = useState(false);
+  const [gameOver, setGameOver] = useState(false);
+  const [score, setScore] = useState(0);
+  
+  // Oyun değişkenleri
+  const birdRef = useRef({
+    x: 50,
+    y: 150,
+    width: 34,
+    height: 24,
+    gravity: 0.2,
+    velocity: 0,
+    jump: -6
+  });
+  
+  const pipesRef = useRef([]);
+  const frameRef = useRef(0);
+  const scoreRef = useRef(0);
+  
+  // Oyunu başlat
+  const startGame = () => {
+    setGameStarted(true);
+    setGameOver(false);
+    setScore(0);
+    scoreRef.current = 0;
+    birdRef.current.y = 150;
+    birdRef.current.velocity = 0;
+    pipesRef.current = [];
+    frameRef.current = 0;
+    animate();
+  };
+  
+  // Kuşu zıplat
+  const jump = () => {
+    if (!gameOver && gameStarted) {
+      birdRef.current.velocity = birdRef.current.jump;
+    }
+  };
+  
+  // Oyun alanına tıklandığında veya space tuşuna basıldığında zıpla
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.code === 'Space') {
+        if (!gameStarted || gameOver) {
+          startGame();
+        } else {
+          jump();
+        }
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [gameStarted, gameOver]);
+  
+  // Animasyon fonksiyonu
+  const animate = () => {
+    if (!canvasRef.current) return;
+    
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    const bird = birdRef.current;
+    
+    // Ekranı temizle
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Arka planı çiz
+    ctx.fillStyle = '#87CEEB';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Kuşu çiz
+    ctx.fillStyle = '#FFD700';
+    ctx.fillRect(bird.x, bird.y, bird.width, bird.height);
+    
+    // Kuşun fiziği
+    bird.velocity += bird.gravity;
+    bird.y += bird.velocity;
+    
+    // Boruları çiz ve hareket ettir
+    if (frameRef.current % 100 === 0) {
+      const gapHeight = 120;
+      const gapPosition = Math.random() * (canvas.height - gapHeight - 100) + 50;
+      
+      pipesRef.current.push({
+        x: canvas.width,
+        topHeight: gapPosition,
+        bottomY: gapPosition + gapHeight,
+        counted: false
+      });
+    }
+    
+    ctx.fillStyle = '#2E8B57';
+    for (let i = 0; i < pipesRef.current.length; i++) {
+      const pipe = pipesRef.current[i];
+      pipe.x -= 2;
+      
+      // Üst boru
+      ctx.fillRect(pipe.x, 0, 50, pipe.topHeight);
+      // Alt boru
+      ctx.fillRect(pipe.x, pipe.bottomY, 50, canvas.height - pipe.bottomY);
+      
+      // Çarpışma kontrolü
+      if (
+        bird.x + bird.width > pipe.x && 
+        bird.x < pipe.x + 50 && 
+        (bird.y < pipe.topHeight || bird.y + bird.height > pipe.bottomY)
+      ) {
+        setGameOver(true);
+      }
+      
+      // Skor
+      if (pipe.x + 50 < bird.x && !pipe.counted) {
+        pipe.counted = true;
+        scoreRef.current += 1;
+        setScore(scoreRef.current);
+      }
+      
+      // Ekrandan çıkan boruları kaldır
+      if (pipe.x + 50 < 0) {
+        pipesRef.current.splice(i, 1);
+        i--;
+      }
+    }
+    
+    // Zemini çiz
+    ctx.fillStyle = '#8B4513';
+    ctx.fillRect(0, canvas.height - 20, canvas.width, 20);
+    
+    // Oyun sınırlarına çarpma kontrolü
+    if (bird.y <= 0 || bird.y + bird.height >= canvas.height - 20) {
+      setGameOver(true);
+    }
+    
+    // Skoru göster
+    ctx.fillStyle = 'white';
+    ctx.font = '20px Arial';
+    ctx.fillText('Skor: ' + scoreRef.current, 10, 30);
+    
+    frameRef.current++;
+    
+    if (!gameOver) {
+      requestAnimationFrame(animate);
+    }
+  };
+  
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[500px] bg-gray-100 p-4 rounded-lg shadow-md">
+      <h2 className="text-2xl font-bold mb-4">Flappy Bird</h2>
+      
+      <div className="relative">
+        <canvas 
+          ref={canvasRef} 
+          width={400} 
+          height={400}
+          onClick={() => gameStarted ? jump() : startGame()}
+          className="border-2 border-gray-400 rounded cursor-pointer"
+        />
+        
+        {!gameStarted && !gameOver && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 text-white">
+            <div className="text-center">
+              <p className="text-2xl font-bold mb-4">Flappy Bird</p>
+              <button 
+                className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600"
+                onClick={startGame}
+              >
+                Oyunu Başlat
+              </button>
+            </div>
+          </div>
+        )}
+        
+        {gameOver && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 text-white">
+            <div className="text-center">
+              <p className="text-2xl font-bold mb-2">Oyun Bitti</p>
+              <p className="text-xl mb-4">Skor: {score}</p>
+              <button 
+                className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600"
+                onClick={startGame}
+              >
+                Tekrar Oyna
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+      
+      <div className="mt-4 text-sm text-gray-600">
+        <p>Kontroller: Tıklayarak veya Space tuşu ile zıplayabilirsiniz</p>
+      </div>
+    </div>
+  );
+};
+
+export default FlappyBird;
+\`\`\`
+
+Bu Flappy Bird oyunu:
+
+1. HTML5 Canvas kullanarak çizilmiştir
+2. Space tuşu veya ekrana tıklama ile kuşu zıplatabilirsiniz
+3. Borular arasından geçerek puan kazanırsınız
+4. Boruya, yere veya tavana çarparsanız oyun biter
+5. Tailwind CSS ile güzel bir arayüz sunar
+6. Tamamen React hooks kullanarak oluşturulmuştur
+
+Oyunu bir sayfaya eklemek için bu bileşeni import edip kullanabilirsiniz.`,
     createdAt: new Date(),
   },
 ];
